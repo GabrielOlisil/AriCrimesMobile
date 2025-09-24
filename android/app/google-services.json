@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "763138535194",
+    "project_id": "aricrimes-app",
+    "storage_bucket": "aricrimes-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:763138535194:android:2191897507d3bcb3b186a3",
+        "android_client_info": {
+          "package_name": "com.example.o_auth2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "763138535194-molvfhqnvn7vanmmbqga9qiqgef1tlgc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.o_auth2",
+            "certificate_hash": "b9fa9d6c59183e28e840e9cf3958d943610d8a9b"
+          }
+        },
+        {
+          "client_id": "763138535194-q89v6qog6lijoe1h6g5jn1jug30g75nr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1z8Ad1cgggJIIrpiVoZLGER-u82DHBok"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "763138535194-q89v6qog6lijoe1h6g5jn1jug30g75nr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
