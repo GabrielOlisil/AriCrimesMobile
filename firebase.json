@@ -1,0 +1,22 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "aricrimes-app",
+          "appId": "1:763138535194:android:b71a6b4ca7e65d09b186a3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "aricrimes-app",
+          "configurations": {
+            "android": "1:763138535194:android:b71a6b4ca7e65d09b186a3",
+            "web": "1:763138535194:web:663edcbc68c6b5b8b186a3"
+          }
+        }
+      }
+    }
+  }
+}

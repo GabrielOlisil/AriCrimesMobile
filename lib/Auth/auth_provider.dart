@@ -16,29 +16,56 @@ class MyAuthProvider extends ChangeNotifier {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  get googleUser => _googleUser;
-
   get firebaseUser => _firebaseUser;
 
   get isAuthorized => _isAuthorized;
 
   get errorMessage => _errorMessage;
 
-  Future<void> initAuthState() async {
-    await _googleSignIn.initialize();
+ void initAuthState()  {
+    unawaited(
+      _googleSignIn.initialize().then((_) {
+        _googleSignIn.authenticationEvents
+            .listen(_handleAuthEvent)
+            .onError(_handleError);
 
-    _googleSignIn.authenticationEvents
-        .listen(_handleAuthEvent)
-        .onError(_handleError);
+        _googleSignIn.attemptLightweightAuthentication();
+      }),
+    );
   }
+
+
+  Future<void> _sighInWeb() async{
+    GoogleAuthProvider googleProvider = GoogleAuthProvider();
+
+    googleProvider.addScope('openid');
+    googleProvider.setCustomParameters({'login_hint': 'user@example.com'});
+
+    final userCredential = await _auth.signInWithPopup(googleProvider);
+
+
+    _firebaseUser = userCredential.user;
+    notifyListeners();
+  }
+
 
   Future<void> signIn() async {
     try {
       if (_googleSignIn.supportsAuthenticate()) {
         await _googleSignIn.authenticate(scopeHint: scopes);
       } else {
-        // Handle web platform differently
-        print('This platform requires platform-specific sign-in UI');
+
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
+
+        googleProvider.addScope('openid');
+        googleProvider.setCustomParameters({'login_hint': 'user@example.com'});
+
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+
+
+        _firebaseUser = userCredential.user;
+        notifyListeners();
+
       }
     } catch (e) {
       print('Sign-in error: $e');
@@ -68,6 +95,8 @@ class MyAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleAuthEvent(GoogleSignInAuthenticationEvent event) async {
+    print('authEvent');
+
     final GoogleSignInAccount? user = switch (event) {
       GoogleSignInAuthenticationEventSignIn() => event.user,
       _ => null,
