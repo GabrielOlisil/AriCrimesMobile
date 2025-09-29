@@ -5,9 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class MyAuthProvider extends ChangeNotifier {
-  GoogleSignInAccount? _googleUser;
   User? _firebaseUser;
-  bool _isAuthorized = false;
   String _errorMessage = '';
 
   final List<String> scopes = <String>['openid'];
@@ -18,56 +16,56 @@ class MyAuthProvider extends ChangeNotifier {
 
   get firebaseUser => _firebaseUser;
 
-  get isAuthorized => _isAuthorized;
-
   get errorMessage => _errorMessage;
 
- void initAuthState()  {
+  void initAuthState() {
+    _listenToAuthChanges();
+    _firebaseUser = _auth.currentUser;
+
+    print("aaaaaaa");
     unawaited(
       _googleSignIn.initialize().then((_) {
         _googleSignIn.authenticationEvents
             .listen(_handleAuthEvent)
             .onError(_handleError);
-
-        _googleSignIn.attemptLightweightAuthentication();
+        if (_firebaseUser == null) {
+          _googleSignIn.attemptLightweightAuthentication();
+        }
       }),
     );
   }
 
+  void _listenToAuthChanges() {
+    _auth.authStateChanges().listen((User? user) {
+      _firebaseUser = user;
+      _errorMessage = '';
+      notifyListeners();
+    });
+  }
 
-  Future<void> _sighInWeb() async{
+  Future<void> _sighInWeb() async {
     GoogleAuthProvider googleProvider = GoogleAuthProvider();
 
     googleProvider.addScope('openid');
     googleProvider.setCustomParameters({'login_hint': 'user@example.com'});
 
-    final userCredential = await _auth.signInWithPopup(googleProvider);
+    final userCred = await _auth.signInWithPopup(googleProvider);
 
+    if (userCred.user == null) return;
 
-    _firebaseUser = userCredential.user;
+    _firebaseUser = userCred.user;
     notifyListeners();
   }
-
 
   Future<void> signIn() async {
     try {
       if (_googleSignIn.supportsAuthenticate()) {
         await _googleSignIn.authenticate(scopeHint: scopes);
       } else {
-
-        GoogleAuthProvider googleProvider = GoogleAuthProvider();
-
-        googleProvider.addScope('openid');
-        googleProvider.setCustomParameters({'login_hint': 'user@example.com'});
-
-        final userCredential = await _auth.signInWithPopup(googleProvider);
-
-
-        _firebaseUser = userCredential.user;
-        notifyListeners();
-
+        await _sighInWeb();
       }
     } catch (e) {
+      await _googleSignIn.disconnect();
       print('Sign-in error: $e');
     }
   }
@@ -84,9 +82,6 @@ class MyAuthProvider extends ChangeNotifier {
   }
 
   void _handleError(Object e) {
-    _googleUser = null;
-    _firebaseUser = null;
-    _isAuthorized = false;
     _errorMessage = e is GoogleSignInException
         ? _errorMessageFromSignInException(e)
         : 'Unknown error: $e';
@@ -102,40 +97,16 @@ class MyAuthProvider extends ChangeNotifier {
       _ => null,
     };
 
-    if (user == null) {
-      if (event is GoogleSignInAuthenticationEventSignOut) {
-        print('Evento de sign Out');
-        await _auth.signOut();
-        _googleUser = null;
-        _firebaseUser = null;
-        _isAuthorized = false;
-        _errorMessage = '';
-        notifyListeners();
-      }
-
+    if (event is GoogleSignInAuthenticationEventSignOut) {
+      print('Evento de sign Out');
+      await _auth.signOut();
       return;
     }
 
-    final token = user.authentication.idToken;
+    final token = user!.authentication.idToken;
 
     final credential = GoogleAuthProvider.credential(idToken: token);
 
-    final userCredential = await _auth.signInWithCredential(credential);
-
-    if (userCredential.user == null) {
-      print('user credential is null');
-      return;
-    }
-
-    _googleUser = user;
-    _firebaseUser = userCredential.user;
-    _isAuthorized = _firebaseUser != null;
-    _errorMessage = '';
-
-    print('chegou até aqui');
-
-    notifyListeners();
-
-    // await _sendTokenToBackend();
+    await _auth.signInWithCredential(credential);
   }
 }
