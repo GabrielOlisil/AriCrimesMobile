@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:o_auth2/Auth/auth_provider.dart';
+import 'package:o_auth2/auth/auth_provider.dart';
+import 'package:o_auth2/models/CircleData.dart';
 import 'package:provider/provider.dart';
 
 class AuthenticatedBody extends StatefulWidget {
@@ -16,6 +18,9 @@ class AuthenticatedBody extends StatefulWidget {
 class _AuthenticatedBodyState extends State<AuthenticatedBody> {
   late User _user;
 
+  final Set<Circle> _circles = {};
+
+
   Future<void> _handleSignOut() async {
     await Provider.of<MyAuthProvider>(context, listen: false).signOut();
   }
@@ -26,7 +31,33 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
     super.initState();
 
     _user = widget.user;
+    _buildCircles();
+
   }
+
+  void _buildCircles() {
+    // Exemplo de lista de dados. Você receberá isso de uma API, banco de dados, etc.
+    final List<CircleData> circlesData = [
+      CircleData(id: "ponto_central", latitude: -9.91375, longitude: -63.044, radius: 500),
+      CircleData(id: "ponto_vizinho_1", latitude: -9.91800, longitude: -63.050, radius: 300),
+      CircleData(id: "ponto_vizinho_2", latitude: -9.91000, longitude: -63.038, radius: 250),
+    ];
+
+    // Converte cada item da sua lista para um widget Circle
+    for (final circle in circlesData) {
+      _circles.add(
+        Circle(
+          circleId: CircleId(circle.id),
+          center: LatLng(circle.latitude, circle.longitude),
+          radius: circle.radius, // O raio é em metros
+          fillColor: Colors.red.withOpacity(0.3), // Cor de preenchimento
+          strokeWidth: 2, // Largura da borda
+          strokeColor: Colors.red, // Cor da borda
+        ),
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -35,11 +66,13 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
     return Stack(
       children: [
         // O mapa ocupa toda a tela
-        const GoogleMap(
+         GoogleMap(
           initialCameraPosition: CameraPosition(
             target: initialPosition,
             zoom: 14,
           ),
+          circles: _circles,
+
           zoomControlsEnabled:
               false, // Controles de zoom desabilitados para um visual mais limpo
         ),
@@ -63,7 +96,10 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
                       // Foto de perfil do usuário
                       CircleAvatar(
                         radius: 25,
-                        backgroundImage: NetworkImage(_user.photoURL ?? ''),
+                        backgroundImage: CachedNetworkImageProvider(
+                          _user.photoURL ?? '',
+                        ),
+
                         onBackgroundImageError:
                             (_, __) {}, // Lida com caso de foto nula
                       ),
