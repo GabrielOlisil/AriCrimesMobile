@@ -14,17 +14,9 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
-
 }
 dependencies {
-    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
 
-
-    implementation("com.google.firebase:firebase-analytics")
-
-
-    //
 }
 
 
@@ -52,6 +44,12 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+
+        manifestPlaceholders.putAll(
+            mapOf(
+                "appAuthRedirectScheme" to "com.example.oauth2"
+            )
+        )
 
     }
 

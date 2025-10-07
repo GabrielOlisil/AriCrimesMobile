@@ -1,13 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:o_auth2/auth/auth_provider.dart';
 import 'package:o_auth2/models/CircleData.dart';
+import 'package:o_auth2/models/user.dart';
 import 'package:provider/provider.dart';
 
 class AuthenticatedBody extends StatefulWidget {
-  final User user;
+  final AuthUser user;
 
   const AuthenticatedBody({super.key, required this.user});
 
@@ -16,7 +16,7 @@ class AuthenticatedBody extends StatefulWidget {
 }
 
 class _AuthenticatedBodyState extends State<AuthenticatedBody> {
-  late User _user;
+  late AuthUser _user;
 
   final Set<Circle> _circles = {};
 
@@ -97,7 +97,7 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
                       CircleAvatar(
                         radius: 25,
                         backgroundImage: CachedNetworkImageProvider(
-                          _user.photoURL ?? '',
+                          _user.picture ?? '',
                         ),
 
                         onBackgroundImageError:
@@ -109,7 +109,7 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _user.displayName ?? 'Nome não disponível',
+                              _user.name ?? 'Nome não disponível',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
