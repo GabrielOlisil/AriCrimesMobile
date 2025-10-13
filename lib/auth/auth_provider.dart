@@ -267,7 +267,7 @@ class MyAuthProvider extends ChangeNotifier {
     return json.decode(response.body);
   }
 
-  void _processaaToken(String tokenRaw, String access) {
+  void _processToken(String tokenRaw, String access) {
     var token = Jwt.parseJwt(tokenRaw);
 
     var name = token['name'];
