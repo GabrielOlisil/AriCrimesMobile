@@ -34,6 +34,10 @@ String _generateCodeChallenge(String codeVerifier) {
 }
 
 class MyAuthProvider extends ChangeNotifier {
+
+  String? _accessToken;
+
+
   String? _errorMessage;
   bool _isAuthenticated = false;
 
@@ -58,6 +62,9 @@ class MyAuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   bool get isAuthenticated => _isAuthenticated;
+
+  String? get accessToken => _accessToken;
+
 
   AuthUser? get user => _user;
 
@@ -113,14 +120,11 @@ class MyAuthProvider extends ChangeNotifier {
   }
 
   Future<void> signIn() async {
-
-
-    if(!kIsWeb){
+    if (!kIsWeb) {
       _signInMobile();
       return;
     }
     _handleWebAuthFlow();
-
   }
 
   Future<void> _redirectToKeycloakLogin() async {
@@ -193,8 +197,12 @@ class MyAuthProvider extends ChangeNotifier {
 
       final Map<String, dynamic> tokenData = json.decode(response.body);
 
-      if (response.statusCode == 200 && tokenData.containsKey('id_token')) {
-        _processToken(tokenData['id_token']);
+      if (response.statusCode == 200 &&
+          tokenData.containsKey('id_token') &&
+          tokenData.containsKey('access_token'))
+      {
+
+        _processToken(tokenData['id_token'], tokenData['access_token']);
 
         // LIMPEZA: Remove o verifier após o uso bem-sucedido
         html.window.localStorage.remove(_kCodeVerifierKey);
@@ -235,7 +243,7 @@ class MyAuthProvider extends ChangeNotifier {
         throw Exception("Falha ao obter tokens.");
       }
 
-      _processToken(result.idToken!);
+      _processToken(result.idToken!, result.accessToken!);
     } on FlutterAppAuthUserCancelledException {
       _errorMessage = 'Usuário cancelou a autenticação.';
       _resetAuth();
@@ -259,7 +267,7 @@ class MyAuthProvider extends ChangeNotifier {
     return json.decode(response.body);
   }
 
-  void _processToken(String tokenRaw) {
+  void _processaaToken(String tokenRaw, String access) {
     var token = Jwt.parseJwt(tokenRaw);
 
     var name = token['name'];
@@ -280,6 +288,9 @@ class MyAuthProvider extends ChangeNotifier {
     _idToken = tokenRaw;
     _isAuthenticated = true;
     _errorMessage = null;
+    _accessToken = access;
+    print('access token: $access');
+    log('access token: $access');
 
     notifyListeners();
   }
@@ -288,6 +299,7 @@ class MyAuthProvider extends ChangeNotifier {
     _user = null;
     _idToken = null;
     _isAuthenticated = false;
+    _accessToken = null;
     if (kIsWeb) {
       html.window.localStorage.remove(_kCodeVerifierKey);
     }
@@ -300,8 +312,7 @@ class MyAuthProvider extends ChangeNotifier {
 
     _resetAuth();
 
-
-    if(tokenToHint == null){
+    if (tokenToHint == null) {
       return;
     }
 
@@ -323,7 +334,8 @@ class MyAuthProvider extends ChangeNotifier {
       final logoutUri = Uri.parse(endSessionEndpoint).replace(
         queryParameters: {
           'id_token_hint': tokenToHint,
-          'post_logout_redirect_uri': redirectUriWeb, // Redireciona para a URL base do app
+          'post_logout_redirect_uri': redirectUriWeb,
+          // Redireciona para a URL base do app
         },
       );
 
@@ -331,7 +343,9 @@ class MyAuthProvider extends ChangeNotifier {
       // Isso fará o navegador sair do seu aplicativo Flutter
       html.window.location.href = logoutUri.toString();
     } catch (e) {
-      log('Erro ao fazer logout via Web Redirect (a sessão local foi limpa): $e');
+      log(
+        'Erro ao fazer logout via Web Redirect (a sessão local foi limpa): $e',
+      );
     }
   }
 }
