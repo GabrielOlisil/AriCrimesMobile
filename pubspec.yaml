@@ -43,6 +43,8 @@ dependencies:
   cached_network_image: ^3.4.1
   flutter_appauth: ^10.0.0
   jwt_decode: ^0.3.1
+  universal_html: ^2.2.4
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:
