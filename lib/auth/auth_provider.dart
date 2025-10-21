@@ -34,9 +34,7 @@ String _generateCodeChallenge(String codeVerifier) {
 }
 
 class MyAuthProvider extends ChangeNotifier {
-
   String? _accessToken;
-
 
   String? _errorMessage;
   bool _isAuthenticated = false;
@@ -65,7 +63,6 @@ class MyAuthProvider extends ChangeNotifier {
 
   String? get accessToken => _accessToken;
 
-
   AuthUser? get user => _user;
 
   MyAuthProvider() {
@@ -78,9 +75,9 @@ class MyAuthProvider extends ChangeNotifier {
       print(
         'PKCE Verifier carregado do storage: ${_codeVerifier != null ? "Sim" : "Não"}',
       );
-      _handleWebAuthFlow();
+      //_handleWebAuthFlow();
     } else {
-      _signInMobile();
+      //_signInMobile();
     }
   }
 
@@ -199,9 +196,7 @@ class MyAuthProvider extends ChangeNotifier {
 
       if (response.statusCode == 200 &&
           tokenData.containsKey('id_token') &&
-          tokenData.containsKey('access_token'))
-      {
-
+          tokenData.containsKey('access_token')) {
         _processToken(tokenData['id_token'], tokenData['access_token']);
 
         // LIMPEZA: Remove o verifier após o uso bem-sucedido
@@ -289,10 +284,35 @@ class MyAuthProvider extends ChangeNotifier {
     _isAuthenticated = true;
     _errorMessage = null;
     _accessToken = access;
+    _realizeRegister(access);
     print('access token: $access');
     log('access token: $access');
 
     notifyListeners();
+  }
+
+  Future<void> _realizeRegister(String token) async {
+    final url = Uri.parse(
+      'https://aricrimes-api.gabiruka.duckdns.org/auth/login',
+    ); 
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    };
+
+
+    try {
+      final response = await http.post(url, headers: headers);
+
+      if (response.statusCode == 200 ) {
+        print('deu certo');
+      } else {
+        print('Erro ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('Erro na requisição: $e');
+    }
   }
 
   void _resetAuth() {

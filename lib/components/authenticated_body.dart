@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:o_auth2/auth/auth_provider.dart';
+import 'package:o_auth2/components/relato_form.dart';
 import 'package:o_auth2/models/CircleData.dart';
 import 'package:o_auth2/models/user.dart';
 import 'package:provider/provider.dart';
@@ -138,10 +139,16 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {}, //_takesInformation,
-                      child: const Text('chamada a api'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RelatoForm()),
+                        );
+                      },
+                      child: const Text('Registrar novo furto'),
                     ),
                   ),
+
                 ],
               ),
             ),
