@@ -17,7 +17,7 @@ Future<void> main() async {
         Provider<Dio>(
           create: (context) {
             // Cria a instância base do Dio
-            final dio = Dio(BaseOptions(baseUrl: 'http://localhost:8000', ));
+            final dio = Dio(BaseOptions(baseUrl: 'https://aricrimes-api.gabiruka.duckdns.org', ));
 
             // Lê o MyAuthProvider (que já foi criado, pois está acima na lista)
             // context.read() não faz o widget ouvir mudanças, é o ideal aqui.
