@@ -4,6 +4,7 @@ class CircleData {
   final double longitude;
   final double radius;
   final int weight;
+  final int weight;
 
   CircleData({
     required this.id,

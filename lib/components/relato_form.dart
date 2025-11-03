@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:o_auth2/auth/auth_provider.dart';
 import 'package:image_picker/image_picker.dart'; // Para seleção de imagem (funciona na web)
 import 'package:flutter/foundation.dart' show kIsWeb; // Para detectar web
 import 'dart:io'; // Para File no mobile (não usado na web)

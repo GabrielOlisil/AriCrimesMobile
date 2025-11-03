@@ -3,7 +3,6 @@ import 'dart:developer';
 import 'dart:math' hide log;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decode/jwt_decode.dart';
@@ -17,6 +16,9 @@ import 'package:universal_html/html.dart' as html;
 
 // Chave usada no localStorage do navegador
 const String _kCodeVerifierKey = 'pkce_code_verifier';
+const String _kAccessTokenKey = 'auth_access_token';
+const String _kIdTokenKey = 'auth_id_token';
+const String _kRefreshTokenKey = 'auth_refresh_token';
 
 // Gera uma string aleatória (code verifier)
 String _generateCodeVerifier() {
@@ -34,30 +36,26 @@ String _generateCodeChallenge(String codeVerifier) {
 }
 
 class MyAuthProvider extends ChangeNotifier {
-
   String? _accessToken;
-
-
   String? _errorMessage;
   bool _isAuthenticated = false;
-
+  String? _refreshToken;
   AuthUser? _user;
 
-  final appAuth = FlutterAppAuth();
-  final discoveryUrl =
+  final _appAuth = FlutterAppAuth();
+
+  final _discoveryUrl =
       'https://kc.gabiruka.duckdns.org/realms/aricrimes/.well-known/openid-configuration';
 
-  // No Web, usamos a URL base atual como URI de redirecionamento
-  final redirectUriWeb = kIsWeb
+  final _redirectUriWeb = kIsWeb
       ? html.window.location.origin
       : 'com.example.oauth2://auth';
 
-  static const scopes = ['openid', 'email', 'profile'];
-  static const clientId = 'flutter-app';
+  static const _scopes = ['openid', 'email', 'profile'];
+  static const _clientId = 'flutter-app';
 
   String? _idToken;
-  String?
-  _codeVerifier; // Armazena o verifier (carregado do localStorage na Web)
+  String? _codeVerifier;
 
   String? get errorMessage => _errorMessage;
 
@@ -65,22 +63,30 @@ class MyAuthProvider extends ChangeNotifier {
 
   String? get accessToken => _accessToken;
 
-
   AuthUser? get user => _user;
 
   MyAuthProvider() {
-    print('Inicializando Auth Provider. kIsWeb: $kIsWeb');
-    if (_isAuthenticated) return;
-
-    // 1. CARREGA O CODE VERIFIER (SÓ NA WEB)
     if (kIsWeb) {
+      tryLoadFromLocalStorage();
+    }
+  }
+
+  void tryLoadFromLocalStorage() async {
+    try {
       _codeVerifier = html.window.localStorage[_kCodeVerifierKey];
-      print(
-        'PKCE Verifier carregado do storage: ${_codeVerifier != null ? "Sim" : "Não"}',
-      );
-      _handleWebAuthFlow();
-    } else {
-      _signInMobile();
+      final storedAccess = html.window.localStorage[_kAccessTokenKey];
+      final storedRefresh = html.window.localStorage[_kRefreshTokenKey];
+      final storedId = html.window.localStorage[_kIdTokenKey];
+
+      if (storedAccess == null || storedRefresh == null || storedId == null) {
+        await _handleWebAuthFlow();
+        return;
+      }
+
+      _processToken(storedId, storedAccess, storedRefresh);
+    } catch (e, stack) {
+      _errorMessage = "Erro ao iniciar: $e";
+      _resetAuth();
     }
   }
 
@@ -89,7 +95,6 @@ class MyAuthProvider extends ChangeNotifier {
   // =========================================================================
 
   Future<void> _handleWebAuthFlow() async {
-    print("web auth flow");
     try {
       final uri = html.window.location.href;
       final urlParams = Uri.parse(uri).queryParameters;
@@ -100,13 +105,8 @@ class MyAuthProvider extends ChangeNotifier {
         );
         await _exchangeCodeForTokens(urlParams['code']!);
       } else if (urlParams.containsKey('error')) {
-        // 2. Erro do Keycloak (ex: usuário negou)
         _errorMessage = 'Erro de autorização: ${urlParams['error']}';
         _resetAuth();
-      } else {
-        // 3. Nenhum código encontrado. Redirecionar para o Keycloak.
-        print("Nenhum código encontrado. Redirecionando para o Keycloak...");
-        await _redirectToKeycloakLogin();
       }
     } catch (e, stack) {
       log(
@@ -124,7 +124,7 @@ class MyAuthProvider extends ChangeNotifier {
       _signInMobile();
       return;
     }
-    _handleWebAuthFlow();
+    await _redirectToKeycloakLogin();
   }
 
   Future<void> _redirectToKeycloakLogin() async {
@@ -144,10 +144,10 @@ class MyAuthProvider extends ChangeNotifier {
       // 3. Construir e redirecionar
       final loginUri = Uri.parse(authorizationEndpoint).replace(
         queryParameters: {
-          'client_id': clientId,
-          'redirect_uri': redirectUriWeb,
+          'client_id': _clientId,
+          'redirect_uri': _redirectUriWeb,
           'response_type': 'code',
-          'scope': scopes.join(' '),
+          'scope': _scopes.join(' '),
           // PKCE
           'code_challenge': codeChallenge,
           'code_challenge_method': 'S256',
@@ -174,7 +174,7 @@ class MyAuthProvider extends ChangeNotifier {
     if (_codeVerifier == null) {
       // Se não houver verifier, o fluxo é inseguro/quebrado
       _errorMessage =
-          'Erro de segurança: Code Verifier NÃO PODE SER CARREGADO. O fluxo PKCE falhou.';
+          'Erro de segurança: Code Verifier NÃO PODE SER CARREGADO.';
       _resetAuth();
       return;
     }
@@ -188,8 +188,8 @@ class MyAuthProvider extends ChangeNotifier {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
           'grant_type': 'authorization_code',
-          'client_id': clientId,
-          'redirect_uri': redirectUriWeb,
+          'client_id': _clientId,
+          'redirect_uri': _redirectUriWeb,
           'code': code,
           'code_verifier': _codeVerifier!,
         },
@@ -199,10 +199,13 @@ class MyAuthProvider extends ChangeNotifier {
 
       if (response.statusCode == 200 &&
           tokenData.containsKey('id_token') &&
-          tokenData.containsKey('access_token'))
-      {
-
-        _processToken(tokenData['id_token'], tokenData['access_token']);
+          tokenData.containsKey('access_token') &&
+          tokenData.containsKey('refresh_token')) {
+        _processToken(
+          tokenData['id_token'],
+          tokenData['access_token'],
+          tokenData['refresh_token'],
+        );
 
         // LIMPEZA: Remove o verifier após o uso bem-sucedido
         html.window.localStorage.remove(_kCodeVerifierKey);
@@ -216,7 +219,7 @@ class MyAuthProvider extends ChangeNotifier {
         );
       }
     } catch (e) {
-      print('ERRO na troca de código: $e'); // Adicionado log de erro
+      log('ERRO na troca de código: $e'); // Adicionado log de erro
       _errorMessage = 'Erro ao trocar código por tokens: $e';
       _resetAuth();
     }
@@ -229,21 +232,21 @@ class MyAuthProvider extends ChangeNotifier {
   Future<void> _signInMobile() async {
     print('Executando fluxo de autenticação Mobile/Desktop...');
     try {
-      final AuthorizationTokenResponse? result = await appAuth
+      final AuthorizationTokenResponse result = await _appAuth
           .authorizeAndExchangeCode(
             AuthorizationTokenRequest(
-              clientId,
+              _clientId,
               'com.example.oauth2://auth', // URI de redirecionamento Mobile
-              discoveryUrl: discoveryUrl,
-              scopes: scopes,
+              discoveryUrl: _discoveryUrl,
+              scopes: _scopes,
             ),
           );
 
-      if (result == null || result.idToken == null) {
+      if (result.idToken == null) {
         throw Exception("Falha ao obter tokens.");
       }
 
-      _processToken(result.idToken!, result.accessToken!);
+      _processToken(result.idToken!, result.accessToken!, result.refreshToken);
     } on FlutterAppAuthUserCancelledException {
       _errorMessage = 'Usuário cancelou a autenticação.';
       _resetAuth();
@@ -258,7 +261,7 @@ class MyAuthProvider extends ChangeNotifier {
   // =========================================================================
 
   Future<Map<String, dynamic>> _fetchOidcConfig() async {
-    final response = await http.get(Uri.parse(discoveryUrl));
+    final response = await http.get(Uri.parse(_discoveryUrl));
     if (response.statusCode != 200) {
       throw Exception(
         'Não foi possível obter a configuração OIDC do Keycloak. Status: ${response.statusCode}',
@@ -267,7 +270,7 @@ class MyAuthProvider extends ChangeNotifier {
     return json.decode(response.body);
   }
 
-  void _processToken(String tokenRaw, String access) {
+  void _processToken(String tokenRaw, String access, String? refresh) {
     var token = Jwt.parseJwt(tokenRaw);
 
     var name = token['name'];
@@ -285,14 +288,94 @@ class MyAuthProvider extends ChangeNotifier {
       email,
       picture,
     );
+
+    _refreshToken = refresh;
     _idToken = tokenRaw;
     _isAuthenticated = true;
     _errorMessage = null;
     _accessToken = access;
-    print('access token: $access');
-    log('access token: $access');
+
+    if (kIsWeb) {
+      html.window.localStorage[_kIdTokenKey] = _idToken!;
+      html.window.localStorage[_kAccessTokenKey] = _accessToken!;
+      html.window.localStorage[_kRefreshTokenKey] = _refreshToken!;
+    }
+
+    _realizeRegister(access);
 
     notifyListeners();
+  }
+
+  Future<void> _realizeRegister(String token) async {
+    final url = Uri.parse('https://aricrimes-api.gabiruka.duckdns.org/auth/login');
+
+    final headers = {
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
+    };
+
+    try {
+      final response = await http.post(url, headers: headers);
+
+      if (response.statusCode == 200) {
+        _errorMessage = "Erro no login";
+      }
+    } catch (e) {
+      print('Erro na requisição: $e');
+      _errorMessage = "Erro na requisição: $e";
+    }
+  }
+
+  Future<bool> refreshToken() async {
+
+
+    if (_refreshToken == null) {
+      log('Não há refresh token disponível. Forçando logout.');
+      _resetAuth();
+      return false;
+    }
+
+    try {
+      log('Tentando atualizar token usando o refresh token...');
+      final config = await _fetchOidcConfig();
+      final tokenEndpoint = config['token_endpoint'];
+
+      final response = await http.post(
+        Uri.parse(tokenEndpoint),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {
+          'grant_type': 'refresh_token',
+          'client_id': _clientId,
+          'refresh_token': _refreshToken!,
+          // 'scope': scopes.join(' '), // Alguns provedores exigem o escopo, verifique o Keycloak
+        },
+      );
+
+      final Map<String, dynamic> tokenData = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        log('Token atualizado com sucesso.');
+        // Re-processa e salva os novos tokens
+        _processToken(
+          tokenData['id_token'],
+          tokenData['access_token'],
+          tokenData['refresh_token'],
+        );
+        return true;
+      } else {
+        // Ex: "invalid_grant" - o refresh token expirou ou foi revogado
+        log(
+          'Falha ao atualizar o token: ${tokenData['error_description'] ?? 'Erro desconhecido'}',
+        );
+        // O refresh token é inválido. Desloga o usuário.
+        await signOut();
+        return false;
+      }
+    } catch (e) {
+      log('Erro crítico durante o refresh token: $e. Deslogando.');
+      await signOut();
+      return false;
+    }
   }
 
   void _resetAuth() {
@@ -300,8 +383,13 @@ class MyAuthProvider extends ChangeNotifier {
     _idToken = null;
     _isAuthenticated = false;
     _accessToken = null;
+    _refreshToken = null;
     if (kIsWeb) {
       html.window.localStorage.remove(_kCodeVerifierKey);
+      html.window.localStorage.remove(_kRefreshTokenKey);
+      html.window.localStorage.remove(_kAccessTokenKey);
+      html.window.localStorage.remove(_kIdTokenKey);
+
     }
     _codeVerifier = null;
     notifyListeners();
@@ -317,11 +405,11 @@ class MyAuthProvider extends ChangeNotifier {
     }
 
     if (!kIsWeb) {
-      await appAuth.endSession(
+      await _appAuth.endSession(
         EndSessionRequest(
           idTokenHint: _idToken,
           postLogoutRedirectUrl: 'com.example.oauth2://logout',
-          discoveryUrl: discoveryUrl,
+          discoveryUrl: _discoveryUrl,
         ),
       );
       return;
@@ -334,7 +422,7 @@ class MyAuthProvider extends ChangeNotifier {
       final logoutUri = Uri.parse(endSessionEndpoint).replace(
         queryParameters: {
           'id_token_hint': tokenToHint,
-          'post_logout_redirect_uri': redirectUriWeb,
+          'post_logout_redirect_uri': _redirectUriWeb,
           // Redireciona para a URL base do app
         },
       );

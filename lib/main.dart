@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:o_auth2/auth/auth_provider.dart';
+import 'package:o_auth2/auth/dio_interceptor.dart';
 import 'package:o_auth2/components/authenticated_body.dart';
 import 'package:o_auth2/components/unauthenticated_body.dart';
 import 'package:provider/provider.dart';
@@ -9,9 +11,29 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => MyAuthProvider(),
-      child: const MyApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => MyAuthProvider()),
+        Provider<Dio>(
+          create: (context) {
+            // Cria a instância base do Dio
+            final dio = Dio(BaseOptions(baseUrl: 'https://aricrimes-api.gabiruka.duckdns.org/', ));
+
+            // Lê o MyAuthProvider (que já foi criado, pois está acima na lista)
+            // context.read() não faz o widget ouvir mudanças, é o ideal aqui.
+            final authProvider = context.read<MyAuthProvider>();
+
+            // Cria e adiciona o interceptor (agora sem passar 'dio')
+            final interceptor = DioAuthInterceptor(authProvider);
+            dio.interceptors.add(interceptor);
+
+            // Retorna o Dio pronto e configurado
+            return dio;
+          },
+          dispose: (_, dio) => dio.close(),
+        ),
+      ],
+      child: MyApp(),
     ),
   );
 }
