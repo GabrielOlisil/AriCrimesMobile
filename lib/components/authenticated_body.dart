@@ -1,10 +1,15 @@
+import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:o_auth2/auth/auth_provider.dart';
+import 'package:o_auth2/components/relato_form.dart';
 import 'package:o_auth2/models/CircleData.dart';
 import 'package:o_auth2/models/user.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 class AuthenticatedBody extends StatefulWidget {
   final AuthUser user;
@@ -20,7 +25,6 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
 
   final Set<Circle> _circles = {};
 
-
   Future<void> _handleSignOut() async {
     await Provider.of<MyAuthProvider>(context, listen: false).signOut();
   }
@@ -32,41 +36,78 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
 
     _user = widget.user;
     _buildCircles();
-
   }
 
   void _buildCircles() {
-    // Exemplo de lista de dados. Você receberá isso de uma API, banco de dados, etc.
-    final List<CircleData> circlesData = [
-      CircleData(id: "ponto_central", latitude: -9.91375, longitude: -63.044, radius: 500),
-      CircleData(id: "ponto_vizinho_1", latitude: -9.91800, longitude: -63.050, radius: 300),
-      CircleData(id: "ponto_vizinho_2", latitude: -9.91000, longitude: -63.038, radius: 250),
-    ];
+    final today = DateTime.utc(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
 
-    // Converte cada item da sua lista para um widget Circle
-    for (final circle in circlesData) {
-      _circles.add(
-        Circle(
-          circleId: CircleId(circle.id),
-          center: LatLng(circle.latitude, circle.longitude),
-          radius: circle.radius, // O raio é em metros
-          fillColor: Colors.red.withOpacity(0.3), // Cor de preenchimento
-          strokeWidth: 2, // Largura da borda
-          strokeColor: Colors.red, // Cor da borda
-        ),
-      );
-    }
+    const duracaoParaSubtrair = Duration(days: 14);
+
+    final lastTwoWeeks = today.subtract(duracaoParaSubtrair);
+
+    final url = Uri.parse(
+      'http://localhost:8000/heatmap?start_date=$lastTwoWeeks&end_date=$today&eps_km=0.5&min_samples=3',
+    );
+    http.get(url, headers: {"Accept": "application/json"}).then((response) {
+      if (response.statusCode != 200) {
+        return;
+      }
+
+      final resData = jsonDecode(response.body) as List<dynamic>;
+
+      final List<CircleData> circlesData = [];
+
+      for (var i in resData) {
+        print(i['latitude']);
+        print(i['longitude']);
+        print(i['radius_meters']);
+        print(i['weight']);
+
+        circlesData.add(
+          CircleData(
+            id: i.hashCode.toString(),
+            latitude: i['latitude'],
+            longitude: i['longitude'],
+            radius: i['radius_meters'],
+            weight: i['weight'],
+          ),
+        );
+      }
+
+      for (final circle in circlesData) {
+        setState(() {
+          _circles.add(
+            Circle(
+              circleId: CircleId(circle.id),
+              center: LatLng(circle.latitude, circle.longitude),
+              radius: circle.radius,
+              fillColor: Colors.red.withOpacity(0.3),
+              strokeWidth: 2,
+              strokeColor: Colors.red,
+            ),
+          );
+        });
+      }
+    });
   }
-
 
   @override
   Widget build(BuildContext context) {
+    final token = Provider.of<MyAuthProvider>(
+      context,
+      listen: false,
+    ).accessToken;
+
     const LatLng initialPosition = LatLng(-9.91375, -63.044);
 
     return Stack(
       children: [
         // O mapa ocupa toda a tela
-         GoogleMap(
+        GoogleMap(
           initialCameraPosition: CameraPosition(
             target: initialPosition,
             zoom: 14,
@@ -132,14 +173,36 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
                         icon: const Icon(Icons.logout, color: Colors.red),
                         onPressed: _handleSignOut,
                       ),
+                      IconButton(
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: token!));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  "O token foi copiado para a área de transferencia",
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.copy_all),
+                      ),
                     ],
                   ),
                   const Divider(height: 24),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {}, //_takesInformation,
-                      child: const Text('chamada a api'),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RelatoForm(),
+                          ),
+                        );
+                      },
+                      child: const Text('Registrar novo furto'),
                     ),
                   ),
                 ],
