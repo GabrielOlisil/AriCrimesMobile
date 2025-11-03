@@ -307,7 +307,7 @@ class MyAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _realizeRegister(String token) async {
-    final url = Uri.parse('https://aricrimes-api.gabiruka.duckdns.org/login');
+    final url = Uri.parse('https://aricrimes-api.gabiruka.duckdns.org/auth/login');
 
     final headers = {
       'Authorization': 'Bearer $token',

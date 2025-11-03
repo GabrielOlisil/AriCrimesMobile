@@ -23,7 +23,7 @@ class AuthenticatedBody extends StatefulWidget {
 class _AuthenticatedBodyState extends State<AuthenticatedBody> {
   late AuthUser _user;
 
-  final Set<Circle> _circles = {};
+  Set<Circle> _circles = {};
 
   Future<void> _handleSignOut() async {
     await Provider.of<MyAuthProvider>(context, listen: false).signOut();
@@ -50,48 +50,83 @@ class _AuthenticatedBodyState extends State<AuthenticatedBody> {
     final lastTwoWeeks = today.subtract(duracaoParaSubtrair);
 
     final url = Uri.parse(
-      'http://localhost:8000/heatmap?start_date=$lastTwoWeeks&end_date=$today&eps_km=0.5&min_samples=3',
+      'https://aricrimes-api.gabiruka.duckdns.org/heatmap?start_date=$lastTwoWeeks&end_date=$today&eps_km=0.5&min_samples=3',
     );
     http.get(url, headers: {"Accept": "application/json"}).then((response) {
       if (response.statusCode != 200) {
         return;
       }
 
-      final resData = jsonDecode(response.body) as List<dynamic>;
+      final resData = jsonDecode(response.body) as Map<String, dynamic>;
 
       final List<CircleData> circlesData = [];
+      final List<CircleData> pointsData = [];
 
-      for (var i in resData) {
-        print(i['latitude']);
-        print(i['longitude']);
-        print(i['radius_meters']);
-        print(i['weight']);
+      if (resData.containsKey("circles")) {
+        for (var i in resData["circles"]!) {
+          print(i['latitude']);
+          print(i['longitude']);
+          print(i['radius_meters']);
+          print(i['weight']);
 
-        circlesData.add(
-          CircleData(
-            id: i.hashCode.toString(),
-            latitude: i['latitude'],
-            longitude: i['longitude'],
-            radius: i['radius_meters'],
-            weight: i['weight'],
+          circlesData.add(
+            CircleData(
+              id: i.hashCode.toString(),
+              latitude: i['latitude'],
+              longitude: i['longitude'],
+              radius: i['radius_meters'],
+              weight: i['weight'],
+            ),
+          );
+        }
+      }
+
+      if (resData.containsKey("points")) {
+        for (var i in resData["points"]!) {
+          pointsData.add(
+            CircleData(
+              id: i.hashCode.toString(),
+              latitude: i['lat'],
+              longitude: i['long'],
+              radius: 30,
+              weight: 1,
+            ),
+          );
+        }
+      }
+
+      final Set<Circle> tempCircles = {};
+
+      for (final circle in circlesData) {
+        tempCircles.add(
+          Circle(
+            circleId: CircleId(circle.id),
+            center: LatLng(circle.latitude, circle.longitude),
+            radius: circle.radius,
+            fillColor: Colors.red.withOpacity(0.3),
+            strokeWidth: 2,
+            strokeColor: Colors.red,
           ),
         );
       }
 
-      for (final circle in circlesData) {
-        setState(() {
-          _circles.add(
-            Circle(
-              circleId: CircleId(circle.id),
-              center: LatLng(circle.latitude, circle.longitude),
-              radius: circle.radius,
-              fillColor: Colors.red.withOpacity(0.3),
-              strokeWidth: 2,
-              strokeColor: Colors.red,
-            ),
-          );
-        });
+      for (final circle in pointsData) {
+        tempCircles.add(
+          Circle(
+            circleId: CircleId(circle.id),
+            center: LatLng(circle.latitude, circle.longitude),
+            radius: circle.radius,
+            fillColor: Color.fromARGB(255, 60, 20, 10),
+            strokeWidth: 2,
+            strokeColor: Colors.red,
+          ),
+        );
       }
+
+
+      setState(() {
+        _circles = tempCircles;
+      });
     });
   }
 
