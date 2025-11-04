@@ -133,33 +133,36 @@ class _RelatoFormState extends State<RelatoForm> {
         "categoria_id": categoriaId,
       };
 
-      FormData formData;
+      // FormData formData;
 
-      if (selectedImage != null) {
-        final fileName = path.basename(selectedImage!.path);
-        MultipartFile imageFile;
+      // if (selectedImage != null) {
+      //   final fileName = path.basename(selectedImage!.path);
+      //   MultipartFile imageFile;
 
-        if (kIsWeb) {
-          // Na web: Lê como bytes e usa fromBytes (essencial!)
-          final bytes = await selectedImage!.readAsBytes();
-          imageFile = MultipartFile.fromBytes(bytes, filename: fileName);
-        } else {
-          // Mobile: Usa fromFile normal
-          imageFile = await MultipartFile.fromFile(selectedImage!.path, filename: fileName);
-        }
+      //   if (kIsWeb) {
+      //     // Na web: Lê como bytes e usa fromBytes (essencial!)
+      //     final bytes = await selectedImage!.readAsBytes();
+      //     imageFile = MultipartFile.fromBytes(bytes, filename: fileName);
+      //   } else {
+      //     // Mobile: Usa fromFile normal
+      //     imageFile = await MultipartFile.fromFile(selectedImage!.path, filename: fileName);
+      //   }
 
-        formData = FormData.fromMap({
-          ...dataMap,
-          "imagem": imageFile, // Nome do campo: ajuste se a API esperar outro (ex: "foto")
-        });
-      } else {
-        // Se não houver imagem, envie FormData com apenas os dados
-        formData = FormData.fromMap(dataMap);
-      }
+      //   formData = FormData.fromMap({
+      //     ...dataMap,
+      //     "imagem": imageFile, // Nome do campo: ajuste se a API esperar outro (ex: "foto")
+      //   });
+      // } else {
+      //   // Se não houver imagem, envie FormData com apenas os dados
+      //   formData = FormData.fromMap(dataMap);
+      // }
 
       final response = await dio.post(
-        '/relato',
-        data: formData,
+        '/relato/',
+        data: dataMap,
+        options: Options(
+          headers: {'Content-Type': 'application/json', }
+      )
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {

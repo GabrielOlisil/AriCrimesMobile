@@ -16,6 +16,8 @@ class DioAuthInterceptor extends Interceptor {
       options.headers['Authorization'] = 'Bearer ${authProvider.accessToken}';
     }
 
+    options.headers['Accept'] = "application/json";
+
     return handler.next(options);
   }
 

@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart'; // Para obter a localização inicial
-import 'package:geocoding/geocoding.dart'; // Opcional: para buscar o endereço
 
 class MapSelectionScreen extends StatefulWidget {
   // O construtor não precisa de nada por enquanto, mas se você quiser
