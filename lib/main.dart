@@ -1,21 +1,11 @@
 // lib/main.dart
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
-// Auth
 import 'package:o_auth2/auth/auth_provider.dart';
-import 'package:o_auth2/services/dio_interceptor.dart';
-
-// Services
-import 'package:o_auth2/services/relato_service.dart';
-import 'package:o_auth2/services/location_service.dart';
-
-// Controllers
-import 'package:o_auth2/controllers/relato_manager_controller.dart';
-
-// Views
-import 'package:o_auth2/views/home_view.dart';
+import 'package:o_auth2/auth/dio_interceptor.dart';
+import 'package:o_auth2/components/authenticated_body.dart';
+import 'package:o_auth2/components/unauthenticated_body.dart';
+import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,27 +13,24 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        // 1. Auth Provider
-        ChangeNotifierProvider<MyAuthProvider>(
-          create: (_) => MyAuthProvider(),
-        ),
-
-        // 2. Dio + interceptor (usa auth provider para adicionar o interceptor)
+        ChangeNotifierProvider(create: (context) => MyAuthProvider()),
         Provider<Dio>(
           create: (context) {
-            final dio = Dio(
-              BaseOptions(
-                baseUrl: 'https://aricrimes-api.gabiruka.duckdns.org/',
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 30),
-              ),
-            );
+            // Cria a instância base do Dio
+            final dio = Dio(BaseOptions(baseUrl: 'https://aricrimes-api.gabiruka.duckdns.org/', ));
 
-            final auth = context.read<MyAuthProvider>();
-            dio.interceptors.add(DioAuthInterceptor(auth, dio));
+            // Lê o MyAuthProvider (que já foi criado, pois está acima na lista)
+            // context.read() não faz o widget ouvir mudanças, é o ideal aqui.
+            final authProvider = context.read<MyAuthProvider>();
 
+            // Cria e adiciona o interceptor (agora sem passar 'dio')
+            final interceptor = DioAuthInterceptor(authProvider);
+            dio.interceptors.add(interceptor);
+
+            // Retorna o Dio pronto e configurado
             return dio;
           },
+          // Garante que a conexão do Dio seja fechada quando o provider for removido
           dispose: (_, dio) => dio.close(),
         ),
 
@@ -82,19 +69,45 @@ Future<void> main() async {
           },
         ),
       ],
-      child: const MyApp(),
+      child: MyApp(),
     ),
   );
 }
 
+/// O Widget Raiz do aplicativo.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: HomeView(),
-      debugShowCheckedModeBanner: false,
+    return MaterialApp(home: HomePage(), debugShowCheckedModeBanner: false);
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var user = Provider.of<MyAuthProvider>(context, listen: true).user;
+
+    if (user == null) {
+      return Scaffold(body: UnauthenticatedBody());
+    }
+
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      body: AuthenticatedBody(user: user),
     );
   }
 }
