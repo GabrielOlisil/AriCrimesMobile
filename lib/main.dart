@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +12,8 @@ import 'package:o_auth2/services/location_service.dart';
 
 // Controllers
 import 'package:o_auth2/controllers/relato_manager_controller.dart';
+// ⭐️ ADICIONAR O NOVO CONTROLLER
+import 'package:o_auth2/controllers/latest_relatos_controller.dart'; 
 
 // Views
 import 'package:o_auth2/views/home_view.dart';
@@ -24,9 +25,7 @@ Future<void> main() async {
     MultiProvider(
       providers: [
         // 1. Auth Provider
-        ChangeNotifierProvider<MyAuthProvider>(
-          create: (_) => MyAuthProvider(),
-        ),
+        ChangeNotifierProvider<MyAuthProvider>(create: (_) => MyAuthProvider()),
 
         // 2. Dio + interceptor (usa auth provider para adicionar o interceptor)
         Provider<Dio>(
@@ -76,10 +75,19 @@ Future<void> main() async {
             relatoService: context.read<RelatoService>(),
           ),
           update: (context, relatoService, controller) {
-            controller ??= RelatoManagerController(relatoService: relatoService);
-            // Se desejar, poderia expor um método para atualizar a instância interna do service.
-            // Aqui recriamos o controller se for nulo, caso contrário você pode atualizar campos se necessário.
+            controller ??= RelatoManagerController(
+              relatoService: relatoService,
+            );
             return controller;
+          },
+        ),
+
+        // 6. ⭐️ NOVO: LatestRelatosController (Depende do RelatoService)
+        ChangeNotifierProvider<LatestRelatosController>(
+          create: (context) {
+            // Usa context.read para pegar a instância do RelatoService que já foi criada
+            final relatoService = context.read<RelatoService>(); 
+            return LatestRelatosController(relatoService);
           },
         ),
       ],

@@ -68,7 +68,9 @@ class _RelatoFormViewState extends State<RelatoFormView> {
                   // --- CAMPOS DE TEXTO ---
                   TextFormField(
                     controller: _controller.objRoubadoController,
-                    decoration: const InputDecoration(labelText: 'Objeto Roubado'),
+                    decoration: const InputDecoration(
+                      labelText: 'Objeto Roubado',
+                    ),
                     validator: (v) =>
                         v == null || v.isEmpty ? 'Informe o objeto' : null,
                   ),
@@ -106,22 +108,6 @@ class _RelatoFormViewState extends State<RelatoFormView> {
                       enabled: false,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _controller.latitudeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Latitude',
-                      enabled: false,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _controller.longitudeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Longitude',
-                      enabled: false,
-                    ),
-                  ),
 
                   const SizedBox(height: 24),
 
@@ -153,7 +139,10 @@ class _RelatoFormViewState extends State<RelatoFormView> {
                       _controller.feedbackMessage!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: _controller.feedbackMessage!.toLowerCase().contains("sucesso")
+                        color:
+                            _controller.feedbackMessage!.toLowerCase().contains(
+                              "sucesso",
+                            )
                             ? Colors.green
                             : Colors.red,
                         fontWeight: FontWeight.bold,
