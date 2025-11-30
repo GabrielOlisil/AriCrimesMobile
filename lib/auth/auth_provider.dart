@@ -51,7 +51,7 @@ class MyAuthProvider extends ChangeNotifier {
       ? html.window.location.origin
       : 'com.example.oauth2://auth';
 
-  static const _scopes = ['openid', 'email', 'profile'];
+  static const _scopes = ['openid', 'email', 'profile', 'offline_access'];
   static const _clientId = 'flutter-app';
 
   String? _idToken;

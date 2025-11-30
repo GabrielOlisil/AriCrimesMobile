@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:o_auth2/controllers/category_controller.dart';
 import 'package:provider/provider.dart';
 
 // Auth
@@ -88,6 +89,19 @@ Future<void> main() async {
             // Usa context.read para pegar a instância do RelatoService que já foi criada
             final relatoService = context.read<RelatoService>(); 
             return LatestRelatosController(relatoService);
+          },
+        ),
+
+
+        ChangeNotifierProvider<CategoryController>(
+          create: (context) {
+            final service = context.read<RelatoService>();
+            final controller = CategoryController(service);
+
+            // 🔥 O Pulo do Gato: Chama a API assim que o app nasce
+            controller.loadCategorias();
+
+            return controller;
           },
         ),
       ],

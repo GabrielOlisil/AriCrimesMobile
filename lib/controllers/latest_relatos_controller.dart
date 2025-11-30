@@ -1,61 +1,117 @@
 // lib/controllers/latest_relatos_controller.dart
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart'; // Necessário para ChangeNotifier
-import '../services/relato_service.dart'; // Assumindo que este serviço já existe
+import 'package:flutter/material.dart';
+import '../services/relato_service.dart';
 
-/// Controller para gerenciar a lista de relatos mais recentes de todos os usuários.
 class LatestRelatosController extends ChangeNotifier {
   final RelatoService _relatoService;
+
+  // --- Estado dos Dados ---
   List<Map<String, dynamic>> _relatos = [];
-  bool _isLoading = false;
+
+  // --- Estado de Controle ---
+  bool _isLoading = false;      // Loading inicial (tela branca ou spinner central)
+  bool _isLoadingMore = false;  // Loading de rodapé (paginação)
   String? _errorMessage;
 
+  // --- Paginação ---
+  int _offset = 0;
+  final int _limit = 10;
+  bool _hasMore = true;
+
+  // --- Filtros ---
+  int? _currentCategoryId;
+  String _currentTitle = "Novos Relatos";
+
+  // --- Getters ---
   List<Map<String, dynamic>> get relatos => _relatos;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   String? get errorMessage => _errorMessage;
+  bool get hasMore => _hasMore;
+  String get currentTitle => _currentTitle;
 
   LatestRelatosController(this._relatoService);
 
-  /// Busca os relatos mais recentes e filtra apenas os registrados nos últimos 7 dias.
-  Future<void> fetchLatestRelatos() async {
-    _isLoading = true;
-    _errorMessage = null;
+  /// Método chamado pela HomeView para iniciar a tela com ou sem filtro.
+  /// Resolve o erro: "The method 'loadRelatos' isn't defined".
+  Future<void> loadRelatos({int? categoryId, String? categoryName}) async {
+    _currentCategoryId = categoryId;
+
+    // Define o título da tela
+    if (categoryId != null) {
+      _currentTitle = categoryName ?? "Categoria";
+    } else {
+      _currentTitle = "Novos Relatos";
+    }
+
+    // Reseta a paginação e limpa a lista para a nova busca
+    _offset = 0;
+    _hasMore = true;
+    _relatos.clear();
+
+    // Inicia a busca (com loading tela cheia)
+    await _fetchData(isRefresh: true);
+  }
+
+  /// Chamado pelo RefreshIndicator (arrastar pra baixo)
+  Future<void> refresh() async {
+    _offset = 0;
+    _hasMore = true;
+    // Não limpamos _relatos imediatamente para não piscar a tela em branco
+    await _fetchData(isRefresh: true);
+  }
+
+  /// Chamado pelo ScrollController quando chega no fim da lista
+  Future<void> loadMore() async {
+    if (_isLoadingMore || !_hasMore || _isLoading) return;
+    await _fetchData(isRefresh: false);
+  }
+
+  /// Lógica central de busca
+  Future<void> _fetchData({required bool isRefresh}) async {
+    if (isRefresh) {
+      _isLoading = true;
+      _errorMessage = null;
+    } else {
+      _isLoadingMore = true;
+    }
     notifyListeners();
 
     try {
-      // CORREÇÃO AQUI: Chamando o método correto 'fetchLatestRelatos' do service.
-      // Buscamos um limite maior (ex: 100) para ter uma boa chance de pegar relatos recentes.
-      final fetchedRelatos = await _relatoService.fetchLatestRelatos(limit: 100);
+      List<Map<String, dynamic>> newRelatos;
 
-      // 1. Filtragem para os últimos 7 dias (lógica no lado do cliente)
-      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-      
-      final filteredRelatos = fetchedRelatos.where((relato) {
-        try {
-          // Converte a data de registro para DateTime (o campo 'data_registro' é formatado como date-time na API)
-          final dataRegistro = DateTime.parse(relato['data_registro'] as String);
-          // Retorna apenas se o relato foi registrado após os últimos 7 dias
-          return dataRegistro.isAfter(sevenDaysAgo);
-        } catch (e) {
-          // Ignora relatos com data inválida
-          return false;
-        }
-      }).toList();
+      // Decide qual endpoint chamar baseado no filtro atual
+      if (_currentCategoryId != null) {
+        newRelatos = await _relatoService.getRelatosPorCategoria(
+          _currentCategoryId!,
+          offset: _offset,
+          limit: _limit,
+        );
+      } else {
+        newRelatos = await _relatoService.fetchLatestRelatos(
+          offset: _offset,
+          limit: _limit,
+        );
+      }
 
-      // 2. Ordena por data de registro (mais recente primeiro)
-      filteredRelatos.sort((a, b) {
-        final dateA = DateTime.parse(a['data_registro'] as String);
-        final dateB = DateTime.parse(b['data_registro'] as String);
-        return dateB.compareTo(dateA);
-      });
-      
-      _relatos = filteredRelatos;
+      // Lógica de paginação
+      if (newRelatos.length < _limit) {
+        _hasMore = false;
+      }
+
+      if (isRefresh) {
+        _relatos = newRelatos;
+      } else {
+        _relatos.addAll(newRelatos);
+      }
+
+      _offset += newRelatos.length;
 
     } catch (e) {
-      // O erro do Dio ou do serviço
-      _errorMessage = 'Erro ao carregar relatos: $e';
+      _errorMessage = 'Erro ao carregar: $e';
     } finally {
       _isLoading = false;
+      _isLoadingMore = false;
       notifyListeners();
     }
   }

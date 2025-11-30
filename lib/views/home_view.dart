@@ -1,39 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:o_auth2/controllers/category_controller.dart';
 import 'package:provider/provider.dart';
-import 'package:o_auth2/auth/auth_provider.dart'; 
+import 'package:o_auth2/auth/auth_provider.dart';
 import 'package:o_auth2/views/login_view.dart';
-import 'package:o_auth2/views/map_view.dart'; 
-import 'package:o_auth2/models/user.dart'; 
-import 'package:o_auth2/views/relato_list_view.dart'; // Lista de relatos do usuário
-import 'package:o_auth2/views/relato_form_view.dart' show RelatoFormView; 
-import 'package:o_auth2/views/latest_relatos_view.dart'; // 💡 NOVO: Importa a view de Últimos Relatos
+import 'package:o_auth2/views/map_view.dart';
+import 'package:o_auth2/models/user.dart';
+import 'package:o_auth2/models/categoria.dart'; // Importe o modelo
+import 'package:o_auth2/services/relato_service.dart'; // Importe o service
+import 'package:o_auth2/controllers/latest_relatos_controller.dart'; // Importe o controller
+import 'package:o_auth2/views/relato_list_view.dart';
+import 'package:o_auth2/views/relato_form_view.dart' show RelatoFormView;
+import 'package:o_auth2/views/latest_relatos_view.dart';
 
-/// [VIEW]
-/// View principal (antiga 'HomePage').
-/// Atua como um "Portão de Autenticação".
 class HomeView extends StatelessWidget {
- const HomeView({super.key});
+  const HomeView({super.key});
 
- // Método para lidar com a navegação para a lista de relatos (do USUÁRIO)
- void _goToRelatoList(BuildContext context) {
-  Navigator.of(context).push(
-   MaterialPageRoute(
-    builder: (context) => const RelatoListView(),
-   ),
-  );
- }
+  // Navegação para Meus Relatos
+  void _goToRelatoList(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const RelatoListView()),
+    );
+  }
 
- // Método para lidar com a navegação para o formulário de novo relato
- void _goToRelatoForm(BuildContext context) {
-  Navigator.of(context).push(
-   MaterialPageRoute(
-    builder: (context) => const RelatoFormView(),
-   ),
-  );
- }
-  
-  // 💡 NOVO: Método para lidar com a navegação para a lista de ÚLTIMOS relatos (geral)
-  void _goToLatestRelatos(BuildContext context) {
+  // Navegação para Novo Relato
+  void _goToRelatoForm(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const RelatoFormView()),
+    );
+  }
+
+  // Lógica para mostrar categorias e navegar
+  void _showCategorySelectionAndNavigate(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        // Usamos Consumer para ler o estado atual do CategoryController
+        return Consumer<CategoryController>(
+          builder: (context, controller, child) {
+
+            // Se ainda estiver carregando (ex: internet muito lenta na abertura)
+            if (controller.isLoading) {
+              return const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            // Se deu erro, damos opção de tentar de novo
+            if (controller.error != null) {
+              return SizedBox(
+                height: 200,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(controller.error!),
+                      TextButton(
+                        onPressed: () => controller.loadCategorias(),
+                        child: const Text("Tentar Novamente"),
+                      )
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // Lista Pronta (instantânea)
+            return Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Filtrar Relatos",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.access_time, color: Colors.blue),
+                          title: const Text("Recentes"),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _navigateToFeed(context, null, null);
+                          },
+                        ),
+                        const Divider(),
+                        // Mapeia a lista que já está na memória
+                        ...controller.categorias.map((cat) => ListTile(
+                          leading: const Icon(Icons.label_important_outline, color: Colors.orange),
+                          title: Text(cat.nome),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _navigateToFeed(context, cat.id, cat.nome);
+                          },
+                        )),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _navigateToFeed(BuildContext context, int? catId, String? catName) {
+    // 1. Atualiza o estado do Controller ANTES de navegar ou no Init da próxima tela.
+    // Como o Controller é Singleton no main (Provider), podemos acessá-lo aqui,
+    // mas a View reseta no initState com fetchLatestRelatos().
+    // Vamos passar os argumentos para o Controller na construção da View ou via chamada direta.
+
+    // Uma abordagem limpa é resetar o controller aqui:
+    final controller = context.read<LatestRelatosController>();
+    controller.loadRelatos(categoryId: catId, categoryName: catName);
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const LatestRelatosView(),
@@ -41,70 +130,60 @@ class HomeView extends StatelessWidget {
     );
   }
 
- @override
- Widget build(BuildContext context) {
-  // Ouve o AuthProvider.
-  final user = Provider.of<MyAuthProvider>(context, listen: true).user;
+  @override
+  Widget build(BuildContext context) {
+    final user = Provider.of<MyAuthProvider>(context, listen: true).user;
 
-  // Se deslogado, mostra a tela de Login.
-  if (user == null) {
-   return const Scaffold(body: LoginView());
-  }
+    if (user == null) {
+      return const Scaffold(body: LoginView());
+    }
 
-  // Se logado, mostra a tela do Mapa com os botões flutuantes.
-  return Scaffold(
-   extendBodyBehindAppBar: true,
-   body: MapView(user: user), 
-   
-   // Utiliza um Row para exibir os três Floating Action Buttons
-   floatingActionButton: Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-    child: Column( // Usando Column para empilhar os FABs à direita
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      body: MapView(user: user),
+
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Botão 3: Últimos Relatos (Últimos 7 dias)
+            // Botão MODIFICADO: Abre seleção de categoria
             FloatingActionButton.extended(
-              heroTag: 'latest_reports_fab', // Necessário para múltiplos FABs
-              onPressed: () => _goToLatestRelatos(context),
-              label: const Text('Novos Relatos'),
-              icon: const Icon(Icons.access_time_filled),
-              backgroundColor: Colors.orange.shade700, // Cor de destaque
+              heroTag: 'category_reports_fab',
+              onPressed: () => _showCategorySelectionAndNavigate(context),
+              label: const Text('Explorar Relatos'), // Texto alterado para refletir a nova ação
+              icon: const Icon(Icons.search),
+              backgroundColor: Colors.orange.shade700,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            const SizedBox(height: 16), // Espaçamento
-            // Botão 2: Lista de Relatos (do USUÁRIO - existente)
+            const SizedBox(height: 16),
+
             FloatingActionButton.extended(
-              heroTag: 'list_reports_fab', // Necessário para múltiplos FABs
+              heroTag: 'list_reports_fab',
               onPressed: () => _goToRelatoList(context),
               label: const Text('Meus Relatos'),
               icon: const Icon(Icons.list_alt),
-              backgroundColor: Colors.red.shade700, 
+              backgroundColor: Colors.red.shade700,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            const SizedBox(height: 16), // Espaçamento
-            // Botão 1: Novo Relato (vai para o Formulário)
+            const SizedBox(height: 16),
+
             FloatingActionButton.extended(
-              heroTag: 'new_report_fab', // Necessário para múltiplos FABs
+              heroTag: 'new_report_fab',
               onPressed: () => _goToRelatoForm(context),
               label: const Text('Novo Relato'),
               icon: const Icon(Icons.add_location_alt),
-              backgroundColor: Colors.blue.shade700, // Cor de destaque
+              backgroundColor: Colors.blue.shade700,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ],
         ),
-   ),
-   floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, // Alinha ao canto inferior direito
-  );
- }
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
 }
