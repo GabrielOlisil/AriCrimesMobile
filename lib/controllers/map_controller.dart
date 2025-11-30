@@ -60,20 +60,5 @@ class MapController extends ChangeNotifier {
     );
   }
 
-  /// Copia o token de acesso para a área de transferência.
-  Future<void> copyTokenToClipboard(BuildContext context) async {
-    final token = _authProvider.accessToken;
-    if (token == null) return;
 
-    await Clipboard.setData(ClipboardData(text: token));
-
-    // Garante que o context ainda é válido antes de mostrar o SnackBar
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("O token foi copiado para a área de transferência"),
-        ),
-      );
-    }
-  }
 }

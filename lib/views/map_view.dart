@@ -144,21 +144,9 @@ class _MapViewState extends State<MapView> {
                     icon: const Icon(Icons.logout, color: Colors.red),
                     onPressed: _controller.signOut, // Chama o Controller
                   ),
-                  IconButton(
-                    onPressed: () => _controller.copyTokenToClipboard(context),
-                    icon: const Icon(Icons.copy_all),
-                  ),
                 ],
               ),
-              const Divider(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  // 7. AÇÕES DELEGADAS AO CONTROLLER
-                  onPressed: () => _controller.navigateToRelatoForm(context),
-                  child: const Text('Registrar novo furto'),
-                ),
-              ),
+
             ],
           ),
         ),
