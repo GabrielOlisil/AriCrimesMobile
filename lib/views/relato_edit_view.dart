@@ -83,12 +83,12 @@ class _RelatoEditViewState extends State<RelatoEditView> {
       appBar: AppBar(
         title: Text('Editar Relato #${widget.relatoId}'),
         backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
       body: ListenableBuilder(
         listenable: _controller,
         builder: (context, child) {
-          // O feedback agora é gerenciado pelo SnackBar dentro do _handleSave
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(
@@ -99,56 +99,96 @@ class _RelatoEditViewState extends State<RelatoEditView> {
                   const Padding(
                     padding: EdgeInsets.only(bottom: 20.0),
                     child: Text(
-                      'Adicione a foto e/ou altere os dados do relato. Clique em "SALVAR ALTERAÇÕES" para finalizar.',
+                      'Edite os dados do relato ou gerencie a foto.',
                       style: TextStyle(fontStyle: FontStyle.italic, color: Colors.blueGrey),
                     ),
                   ),
 
                   // --- SEÇÃO DE IMAGEM ---
-                  _buildImageSection(_controller), 
+                  _buildImageSection(_controller),
+
+                  // AVISO SOBRE A FOTO
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      border: Border.all(color: Colors.amber.shade200),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber, color: Colors.amber.shade800),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Atenção: A foto deve ser APENAS do objeto furtado ou do local. Não envie fotos de pessoas ou suspeitos.",
+                            style: TextStyle(color: Colors.amber.shade900, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   const Divider(),
-                  
-                  // --- CAMPOS DE EDIÇÃO (Dados Textuais) ---
+
+                  // --- CAMPOS DE EDIÇÃO ---
+
+                  // 1. OBJETO ROUBADO (Agora opcional e com novo label)
                   TextFormField(
                     controller: _controller.objRoubadoController,
-                    decoration:
-                        const InputDecoration(labelText: 'Objeto Roubado'),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Informe o objeto' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Houveram objetos roubados?', // Label alterado
+                      hintText: 'Se sim, descreva quais (Ex: Celular, Carteira)',
+                      border: OutlineInputBorder(),
+                    ),
+                    // REMOVIDO VALIDATOR (Opcional)
                   ),
+                  const SizedBox(height: 16),
+
+                  // 2. DESCRIÇÃO
                   TextFormField(
                     controller: _controller.descricaoController,
-                    decoration: const InputDecoration(labelText: 'Descrição'),
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
                     validator: (v) =>
-                        v == null || v.isEmpty ? 'Informe a descrição' : null,
+                    v == null || v.isEmpty ? 'Informe a descrição' : null,
                   ),
-                  
-                  // Campos de localização (tornados editáveis, pois a intenção é editar)
+                  const SizedBox(height: 16),
+
+                  // 3. LOCAL (Editável)
                   TextFormField(
                     controller: _controller.localController,
-                    decoration: const InputDecoration(labelText: 'Local do Furto'),
+                    decoration: const InputDecoration(
+                      labelText: 'Local do Furto',
+                      border: OutlineInputBorder(),
+                    ),
                     validator: (v) =>
-                        v == null || v.isEmpty ? 'Informe o local' : null,
+                    v == null || v.isEmpty ? 'Informe o local' : null,
                   ),
+
+                  // ... (Campos de Lat/Long e botão Salvar mantidos iguais) ...
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
                         child: TextFormField(
                           controller: _controller.latitudeController,
-                          decoration: const InputDecoration(labelText: 'Latitude'),
+                          decoration: const InputDecoration(labelText: 'Latitude', border: OutlineInputBorder()),
                           keyboardType: TextInputType.number,
-                          validator: (v) =>
-                              v == null || double.tryParse(v) == null ? 'Lat inválida' : null,
+                          validator: (v) => v == null || double.tryParse(v) == null ? 'Inválido' : null,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextFormField(
                           controller: _controller.longitudeController,
-                          decoration: const InputDecoration(labelText: 'Longitude'),
+                          decoration: const InputDecoration(labelText: 'Longitude', border: OutlineInputBorder()),
                           keyboardType: TextInputType.number,
-                          validator: (v) =>
-                              v == null || double.tryParse(v) == null ? 'Long inválida' : null,
+                          validator: (v) => v == null || double.tryParse(v) == null ? 'Inválido' : null,
                         ),
                       ),
                     ],
@@ -156,23 +196,21 @@ class _RelatoEditViewState extends State<RelatoEditView> {
 
                   const SizedBox(height: 24),
 
-                  // --- Botão de Salvamento ---
                   _controller.isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : ElevatedButton.icon(
-                            icon: const Icon(Icons.save),
-                            label: const Text('SALVAR ALTERAÇÕES'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue.shade800,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            // MUDANÇA: Chama o método local sem passar o context para o Controller
-                            onPressed: _handleSave, 
-                          ),
+                    icon: const Icon(Icons.save),
+                    label: const Text('SALVAR ALTERAÇÕES'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade800,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: _handleSave,
+                  ),
                   const SizedBox(height: 20),
                 ],
               ),

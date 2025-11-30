@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:o_auth2/controllers/category_controller.dart';
+import 'package:o_auth2/views/relato_search_view.dart';
 import 'package:provider/provider.dart';
 import 'package:o_auth2/auth/auth_provider.dart';
 import 'package:o_auth2/views/login_view.dart';
@@ -148,6 +149,21 @@ class HomeView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+
+            FloatingActionButton( // Mini ou normal, usei normal para destaque
+              heroTag: 'search_fab',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const RelatoSearchView()),
+                );
+              },
+              backgroundColor: Colors.teal.shade600,
+              foregroundColor: Colors.white,
+              tooltip: 'Pesquisar Relatos',
+              child: const Icon(Icons.search),
+            ),
+
+            const SizedBox(height: 16),
             // Botão MODIFICADO: Abre seleção de categoria
             FloatingActionButton.extended(
               heroTag: 'category_reports_fab',

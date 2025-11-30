@@ -173,7 +173,7 @@ class RelatoManagerController extends ChangeNotifier {
    notifyListeners();
    return;
   }
-  
+
   _isLoading = true;
   _errorMessage = null;
   notifyListeners();
@@ -182,18 +182,18 @@ class RelatoManagerController extends ChangeNotifier {
   String? dataError;
 
   try {
-   // A. DELEÇÃO DA FOTO
+   // A. DELEÇÃO DA FOTO (Mantido igual)
    if (_shouldDeleteImage) {
-     final deleteError = await _relatoService.deleteFotoParaRelato(_editingRelatoId!); 
-     if (deleteError != null) {
-      photoError = "Falha ao deletar foto: $deleteError";
-     } else {
-      _shouldDeleteImage = false; 
-      _existingPhotoUrl = null; // Remove URL após deleção bem-sucedida
-     }
+    final deleteError = await _relatoService.deleteFotoParaRelato(_editingRelatoId!);
+    if (deleteError != null) {
+     photoError = "Falha ao deletar foto: $deleteError";
+    } else {
+     _shouldDeleteImage = false;
+     _existingPhotoUrl = null;
+    }
    }
 
-   // B. UPLOAD DA FOTO
+   // B. UPLOAD DA FOTO (Mantido igual)
    if (photoError == null && _selectedImage != null) {
     photoError = await _relatoService.uploadFotoParaRelato(
      relatoId: _editingRelatoId!,
@@ -203,22 +203,22 @@ class RelatoManagerController extends ChangeNotifier {
 
    if (photoError != null) {
     _errorMessage = "Erro na Foto: $photoError";
-    return; 
+    // Não retorna aqui, tenta salvar os dados textuais mesmo se a foto falhar
    }
-   
+
    // C. ATUALIZAÇÃO DE DADOS (PUT)
    final updatedData = {
-    "obj_roubado": objRoubadoController.text,
+    // MUDANÇA: Permite string vazia se o controller estiver vazio
+    "obj_roubado": objRoubadoController.text.isEmpty ? "" : objRoubadoController.text,
     "descricao": descricaoController.text,
     "local": localController.text,
-    // Tenta converter para double; 0.0 será enviado se falhar
     "latitude": double.tryParse(latitudeController.text) ?? 0.0,
     "longitude": double.tryParse(longitudeController.text) ?? 0.0,
-    
-    // Mantém dados não editáveis
-    "data_furto": _requiredInitialData!['data_furto']?.toString() ?? DateTime.now().toIso8601String(),
-    "data_registro": _requiredInitialData!['data_registro']?.toString() ?? DateTime.now().toIso8601String(),
-    "categoria_id": _requiredInitialData!['categoria_id'] ?? 1, 
+
+    // Mantém dados originais
+    "data_furto": _requiredInitialData!['data_furto'],
+    "data_registro": _requiredInitialData!['data_registro'],
+    "categoria_id": _requiredInitialData!['categoria_id'],
    };
 
    dataError = await _relatoService.updateRelato(
@@ -228,21 +228,21 @@ class RelatoManagerController extends ChangeNotifier {
 
    if (dataError != null) {
     _errorMessage = "Falha ao atualizar dados: $dataError";
-    return; 
+    return;
    }
 
    // D. SUCESSO
    String finalMessage = "Relato atualizado com sucesso!";
    if (_selectedImage != null) {
     finalMessage += " Foto enviada.";
-    _selectedImage = null; 
-   } else if (_shouldDeleteImage) { 
+    _selectedImage = null;
+   } else if (_shouldDeleteImage) {
     finalMessage += " Foto removida.";
     _shouldDeleteImage = false;
    }
-   
-   _errorMessage = finalMessage; 
-   
+
+   _errorMessage = finalMessage;
+
   } on Exception catch (e) {
    _errorMessage = "Erro crítico ao salvar: ${e.toString().split("Exception:").last.trim()}";
   } finally {

@@ -378,4 +378,68 @@ class RelatoService {
       throw Exception("Falha ao carregar relatos da categoria.");
     }
   }
+
+  Future<List<Map<String, dynamic>>> searchRelatos(String query, {int offset = 0, int limit = 20}) async {
+    try {
+      final response = await _dio.get(
+        '/relato/search/text',
+        queryParameters: {
+          'q': query, // O termo de busca
+          'offset': offset,
+          'limit': limit,
+        },
+        options: Options(
+          headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : null,
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Erro na busca: ${response.statusCode}");
+      }
+
+      return List<Map<String, dynamic>>.from(response.data as List);
+    } catch (e) {
+      log('Erro ao buscar relatos (search): $e');
+      throw Exception("Falha ao realizar busca.");
+    }
+  }
+
+
+  Future<Map<String, dynamic>> getRelatoById(int id) async {
+    try {
+      final response = await _dio.get(
+        '/relato/$id',
+        options: Options(
+          headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : null,
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Erro ao buscar detalhes do relato $id");
+      }
+
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      log('Erro ao buscar relato por ID: $e');
+      throw Exception("Falha ao carregar detalhes do relato.");
+    }
+  }
+
+  Future<void> confirmarRelato(int relatoId) async {
+    try {
+      final response = await _dio.post(
+        '/relato/$relatoId/confirmar',
+        options: Options(
+          headers: token.isNotEmpty ? {'Authorization': 'Bearer $token'} : null,
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception("Erro ao confirmar relato: ${response.statusCode}");
+      }
+    } catch (e) {
+      log('Erro ao confirmar relato: $e');
+      throw Exception("Falha ao confirmar relato.");
+    }
+  }
 }

@@ -1,9 +1,8 @@
 // lib/views/relato_form_view.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dio/dio.dart';
-
 import '../controllers/relato_form_controller.dart';
+import '../controllers/category_controller.dart'; // Importe o CategoryController
 import '../services/relato_service.dart';
 import '../services/location_service.dart';
 
@@ -20,15 +19,9 @@ class _RelatoFormViewState extends State<RelatoFormView> {
   @override
   void initState() {
     super.initState();
-
-    // Pega as instâncias fornecidas pelo Provider (RelatoService e LocationService)
-    final relatoService = context.read<RelatoService>();
-    final locationService = context.read<LocationService>();
-
-    // Cria o controller com as dependências injetadas
     _controller = RelatoFormController(
-      relatoService: relatoService,
-      locationService: locationService,
+      relatoService: context.read<RelatoService>(),
+      locationService: context.read<LocationService>(),
     );
   }
 
@@ -38,12 +31,51 @@ class _RelatoFormViewState extends State<RelatoFormView> {
     super.dispose();
   }
 
+  // Helper para formatar data na UI
+  String _formatDateTime(DateTime dt) {
+    return "${dt.day}/${dt.month}/${dt.year} às ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+
+  // Lógica para abrir DatePicker e depois TimePicker
+  Future<void> _pickDateTime(BuildContext context) async {
+    final now = DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _controller.dataFurto,
+      firstDate: DateTime(2000),
+      lastDate: now,
+    );
+
+    if (pickedDate != null) {
+      if (!context.mounted) return;
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_controller.dataFurto),
+      );
+
+      if (pickedTime != null) {
+        final finalDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        _controller.setDataFurto(finalDateTime);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Garante que as categorias estejam carregadas
+    final categoryController = context.watch<CategoryController>();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registrar Furto (Passo 1 de 2)'),
-        backgroundColor: const Color.fromARGB(255, 83, 214, 247),
+        title: const Text('Registrar Ocorrência'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
       body: ListenableBuilder(
         listenable: _controller,
@@ -53,99 +85,145 @@ class _RelatoFormViewState extends State<RelatoFormView> {
             child: Form(
               key: _controller.formKey,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 20.0),
-                    child: Text(
-                      'Preencha apenas os dados textuais. Após a confirmação, você será redirecionado para adicionar fotos.',
-                      style: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: Colors.blueGrey,
+                  const Text(
+                    'Preencha os detalhes do ocorrido.',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 1. SELEÇÃO DE CATEGORIA (Dropdown)
+                  DropdownButtonFormField<int>(
+                    value: _controller.selectedCategoryId,
+                    decoration: const InputDecoration(
+                      labelText: 'Categoria da Ocorrência *',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.label),
+                    ),
+                    items: categoryController.categorias.map((cat) {
+                      return DropdownMenuItem<int>(
+                        value: cat.id,
+                        child: Text(cat.nome),
+                      );
+                    }).toList(),
+                    onChanged: (val) => _controller.setCategoria(val),
+                    validator: (v) =>
+                        v == null ? 'Selecione uma categoria' : null,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 2. DATA DO FURTO (Campo clicável)
+                  InkWell(
+                    onTap: () => _pickDateTime(context),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Data e Hora do Ocorrido *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      child: Text(
+                        _formatDateTime(_controller.dataFurto),
+                        style: const TextStyle(fontSize: 16),
                       ),
                     ),
                   ),
 
-                  // --- CAMPOS DE TEXTO ---
-                  TextFormField(
-                    controller: _controller.objRoubadoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Objeto Roubado',
-                    ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Informe o objeto' : null,
-                  ),
+                  const SizedBox(height: 16),
+
+                  // 3. DESCRIÇÃO (Obrigatório)
                   TextFormField(
                     controller: _controller.descricaoController,
-                    decoration: const InputDecoration(labelText: 'Descrição'),
+                    decoration: const InputDecoration(
+                      labelText: 'Descrição Detalhada *',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
+                    maxLines: 3,
                     validator: (v) =>
                         v == null || v.isEmpty ? 'Informe a descrição' : null,
                   ),
 
-                  // --- Botão de MAPA ---
-                  const SizedBox(height: 10),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.map),
-                    label: Text(
-                      _controller.selectedLocation == null
-                          ? 'Selecionar Localização no Mapa (Obrigatório)'
-                          : 'Localização Selecionada',
-                    ),
-                    onPressed: () => _controller.selectLocation(context),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(40),
-                      backgroundColor: _controller.selectedLocation == null
-                          ? Colors.orange
-                          : Colors.green,
-                    ),
-                  ),
+                  const SizedBox(height: 16),
 
-                  // --- CAMPOS DE LOCALIZAÇÃO ---
-                  const SizedBox(height: 12),
+                  // 4. OBJETO ROUBADO (Opcional)
                   TextFormField(
-                    controller: _controller.localController,
+                    controller: _controller.objRoubadoController,
                     decoration: const InputDecoration(
-                      labelText: 'Local',
-                      enabled: false,
+                      labelText: 'Houveram objetos roubados?', // Label alterado
+                      border: OutlineInputBorder(),
+                      helperText:
+                          'Ex: Celular Samsung S20, Carteira de couro... (Deixe em branco se não houve)',
                     ),
                   ),
 
                   const SizedBox(height: 24),
 
-                  // --- BOTÃO DE ENVIO ---
+                  // 5. LOCALIZAÇÃO (Botão)
+                  ElevatedButton.icon(
+                    icon: Icon(
+                      _controller.selectedLocation == null
+                          ? Icons.map
+                          : Icons.check,
+                    ),
+                    label: Text(
+                      _controller.selectedLocation == null
+                          ? 'Selecionar Local no Mapa (Obrigatório)'
+                          : 'Local Selecionado (Toque para alterar)',
+                    ),
+                    onPressed: () => _controller.selectLocation(context),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: _controller.selectedLocation == null
+                          ? Colors.orange.shade700
+                          : Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+
+                  if (_controller.selectedLocation != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        _controller.localController.text,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ),
+
+                  const SizedBox(height: 32),
+
+                  // 6. ENVIAR
                   _controller.isLoading
-                      ? const CircularProgressIndicator()
-                      : ElevatedButton.icon(
-                          icon: const Icon(Icons.send),
-                          label: const Text('ENVIAR RELATO (1ª Fase)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade700,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 20,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                          ),
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton(
                           onPressed: () => _controller.submitRelato(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade800,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(fontSize: 18),
+                          ),
+                          child: const Text('REGISTRAR OCORRÊNCIA'),
                         ),
 
-                  const SizedBox(height: 20),
-
-                  // --- FEEDBACK ---
+                  // FEEDBACK
                   if (_controller.feedbackMessage != null)
-                    Text(
-                      _controller.feedbackMessage!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color:
-                            _controller.feedbackMessage!.toLowerCase().contains(
-                              "sucesso",
-                            )
-                            ? Colors.green
-                            : Colors.red,
-                        fontWeight: FontWeight.bold,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Text(
+                        _controller.feedbackMessage!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color:
+                              _controller.feedbackMessage!
+                                  .toLowerCase()
+                                  .contains("sucesso")
+                              ? Colors.green
+                              : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                 ],

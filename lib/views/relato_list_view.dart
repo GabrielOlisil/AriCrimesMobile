@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:o_auth2/controllers/category_controller.dart';
+import 'package:o_auth2/views/relato_detail_view.dart';
 import 'package:provider/provider.dart';
-import '../controllers/relato_manager_controller.dart';
+import 'package:o_auth2/controllers/relato_manager_controller.dart';
 import 'relato_edit_view.dart'; // Importa a tela de edição
 
 /// Tela que exibe a lista de relatos e permite a interação (edição/deleção).
@@ -12,6 +14,17 @@ class RelatoListView extends StatefulWidget {
 }
 
 class _RelatoListViewState extends State<RelatoListView> {
+
+  String _getCategoryName(BuildContext context, int? catId) {
+    if (catId == null) return "Categoria Desconhecida";
+    // O CategoryController já deve estar carregado pelo main.dart
+    final categories = context.read<CategoryController>().categorias;
+    try {
+      return categories.firstWhere((c) => c.id == catId).nome;
+    } catch (_) {
+      return "Categoria #$catId";
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -140,69 +153,88 @@ class _RelatoListViewState extends State<RelatoListView> {
                   itemBuilder: (context, index) {
                     final relato = controller.relatos[index];
                     final id = relato['id'] as int;
-                    final objRoubado =
-                        relato['obj_roubado']?.toString() ??
-                        'Objeto Desconhecido';
+                    final catId = relato['categoria_id'] as int?; // Pega o ID
+                    final catName = _getCategoryName(context, catId);
+
+
+                    final objRoubado = relato['obj_roubado']?.toString() ?? '';
+
                     final dataFurto = relato['data_furto'] != null
                         ? relato['data_furto'].toString().substring(0, 10)
                         : 'Data Indefinida';
+                    final numConfirmacoes = (relato['numero_confirmacoes'] as num?)?.toInt() ?? 0;
 
                     return Card(
                       elevation: 3,
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 8,
-                        horizontal: 16,
-                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: ListTile(
-                        leading: Icon(
-                          Icons.security_update_warning,
-                          color: Colors.red.shade700,
-                        ),
+                        leading: const Icon(Icons.public, color: Colors.teal),
                         title: Text(
-                          objRoubado,
+                          catName.toUpperCase(),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        subtitle: Text('Data do Furto: $dataFurto'),
+                        subtitle: Column( // Alterado de Text para Column para caber mais info
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Data do Ocorrencia: $dataFurto'),
+
+                            // --- NOVO: Contador ---
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                if (objRoubado.isNotEmpty)
+                                  Text("Item: $objRoubado", style: const TextStyle(fontWeight: FontWeight.w500)),
+
+
+                                Icon(Icons.thumb_up, size: 14, color: Colors.grey.shade600),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "$numConfirmacoes",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // ----------------------
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RelatoDetailView(
+                                relatoId: id,
+                                placeholderData: relato,
+                              ),
+                            ),
+                          ).then((_) {
+                            // Atualiza a lista ao voltar (caso tenha editado ou confirmado)
+                            context.read<RelatoManagerController>().fetchRelatos();
+                          });
+                        },
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Botão de Edição
+                            // ... (seus botões de editar/excluir mantidos aqui)
                             IconButton(
-                              icon: Icon(
-                                Icons.edit,
-                                color: Colors.blue.shade700,
-                              ),
-                              onPressed: controller.isLoading
-                                  ? null
-                                  : () => _editRelato(context, relato),
+                              icon: Icon(Icons.edit, color: Colors.blue.shade700),
+                              onPressed: controller.isLoading ? null : () => _editRelato(context, relato),
                             ),
-                            // Botão de Deleção
                             IconButton(
-                              icon: Icon(
-                                Icons.delete_forever,
-                                color: Colors.red.shade500,
-                              ),
-                              onPressed: controller.isLoading
-                                  ? null
-                                  : () => _deleteRelato(context, id),
+                              icon: Icon(Icons.delete_forever, color: Colors.red.shade500),
+                              onPressed: controller.isLoading ? null : () => _deleteRelato(context, id),
                             ),
                           ],
                         ),
-                        onTap: controller.isLoading
-                            ? null
-                            : () => _editRelato(context, relato),
                       ),
                     );
                   },
                 ),
-          // Botão flutuante para adicionar novo relato (se necessário)
-          // floatingActionButton: FloatingActionButton(
-          //   onPressed: () { /* Navegar para tela de Adição */ },
-          //   child: const Icon(Icons.add),
-          // ),
         );
       },
     );
