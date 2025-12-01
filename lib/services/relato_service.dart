@@ -49,31 +49,28 @@ class RelatoService {
   // =========================================================
   // 1.2 — GET /relato/my (lista do usuário logado)
   // =========================================================
-  Future<List<Map<String, dynamic>>> getMyRelatos() async {
+  Future<List<Map<String, dynamic>>> getMyRelatos({int offset = 0,
+    int limit = 10,}) async {
     // NOVO MÉTODO
     try {
       final response = await _dio.get(
         '$_relatoEndpoint/my', // /relato/my
+        queryParameters: {
+          'offset': offset,
+          'limit': limit,
+        },
         options: Options(
-          // O TOKEN É OBRIGATÓRIO AQUI PARA IDENTIFICAR O USUÁRIO
           headers: {'Authorization': 'Bearer $token'},
         ),
       );
 
       if (response.statusCode != 200) {
-        throw Exception(
-          "Erro ao buscar meus relatos: ${response.statusCode} - ${response.data}",
-        );
+        throw Exception("Erro ao buscar meus relatos: ${response.statusCode}");
       }
 
       return List<Map<String, dynamic>>.from(response.data as List);
     } on DioException catch (e) {
       log('DioException getMyRelatos: ${e.response?.data}', error: e);
-      if (e.response != null) {
-        throw Exception(
-          "Erro API ${e.response!.statusCode}: ${e.response!.data}",
-        );
-      }
       throw Exception("Falha de rede: ${e.message}");
     } catch (e) {
       throw Exception("Falha ao obter meus relatos: $e");
