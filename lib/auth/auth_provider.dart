@@ -4,6 +4,7 @@ import 'dart:math' hide log;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decode/jwt_decode.dart';
 import 'package:o_auth2/models/user.dart';
@@ -42,6 +43,8 @@ class MyAuthProvider extends ChangeNotifier {
   String? _refreshToken;
   AuthUser? _user;
 
+  final _storage = const FlutterSecureStorage();
+
   final _appAuth = FlutterAppAuth();
 
   final _discoveryUrl =
@@ -51,7 +54,11 @@ class MyAuthProvider extends ChangeNotifier {
       ? html.window.location.origin
       : 'com.example.oauth2://auth';
 
-  static const _scopes = ['openid', 'email', 'profile', 'offline_access'];
+  final _redirectUriMobile = 'com.example.oauth2://auth';
+
+  final _scopes = kIsWeb
+      ? ['openid', 'email', 'profile']
+      : ['openid', 'email', 'profile', 'offline_access'];
   static const _clientId = 'flutter-app';
 
   String? _idToken;
@@ -68,6 +75,28 @@ class MyAuthProvider extends ChangeNotifier {
   MyAuthProvider() {
     if (kIsWeb) {
       tryLoadFromLocalStorage();
+    } else {
+      _loadStoredTokens();
+    }
+  }
+
+  Future<void> _loadStoredTokens() async {
+    try {
+      String? storedAccess;
+      String? storedRefresh;
+      String? storedId;
+      // Mobile: Ler do Secure Storage
+      storedAccess = await _storage.read(key: _kAccessTokenKey);
+      storedRefresh = await _storage.read(key: _kRefreshTokenKey);
+      storedId = await _storage.read(key: _kIdTokenKey);
+
+      if (storedAccess != null && storedId != null) {
+        // Se encontrou tokens, restaura a sessão
+        _processToken(storedId, storedAccess, storedRefresh);
+      }
+    } catch (e, stack) {
+      log("Erro ao carregar tokens salvos: $e", stackTrace: stack);
+      _resetAuth();
     }
   }
 
@@ -299,6 +328,12 @@ class MyAuthProvider extends ChangeNotifier {
       html.window.localStorage[_kIdTokenKey] = _idToken!;
       html.window.localStorage[_kAccessTokenKey] = _accessToken!;
       html.window.localStorage[_kRefreshTokenKey] = _refreshToken!;
+    } else{
+      _storage.write(key: _kIdTokenKey, value: _idToken!);
+      _storage.write(key: _kAccessTokenKey, value: _accessToken!);
+      if (_refreshToken != null) {
+        _storage.write(key: _kRefreshTokenKey, value: _refreshToken);
+      }
     }
 
     _realizeRegister(access);
@@ -307,7 +342,9 @@ class MyAuthProvider extends ChangeNotifier {
   }
 
   Future<void> _realizeRegister(String token) async {
-    final url = Uri.parse('https://aricrimes-api.gabiruka.duckdns.org/auth/login');
+    final url = Uri.parse(
+      'https://aricrimes-api.gabiruka.duckdns.org/auth/login',
+    );
 
     final headers = {
       'Authorization': 'Bearer $token',
@@ -317,7 +354,7 @@ class MyAuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(url, headers: headers);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode != 200) {
         _errorMessage = "Erro no login";
       }
     } catch (e) {
@@ -327,50 +364,61 @@ class MyAuthProvider extends ChangeNotifier {
   }
 
   Future<bool> refreshToken() async {
-
-
     if (_refreshToken == null) {
-      log('Não há refresh token disponível. Forçando logout.');
-      _resetAuth();
-      return false;
+
+      _refreshToken = kIsWeb? html.window.localStorage[_kRefreshTokenKey] : await _storage.read(key: _kRefreshTokenKey);
+
+      if(_refreshToken == null){
+        log('Não há refresh token disponível. Forçando logout.');
+        _resetAuth();
+        return false;
+      }
     }
 
     try {
-      log('Tentando atualizar token usando o refresh token...');
-      final config = await _fetchOidcConfig();
-      final tokenEndpoint = config['token_endpoint'];
 
-      final response = await http.post(
-        Uri.parse(tokenEndpoint),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'grant_type': 'refresh_token',
-          'client_id': _clientId,
-          'refresh_token': _refreshToken!,
-          // 'scope': scopes.join(' '), // Alguns provedores exigem o escopo, verifique o Keycloak
-        },
-      );
+      if(!kIsWeb){
+        final TokenResponse? result = await _appAuth.token(TokenRequest(
+          _clientId,
+          _redirectUriMobile,
+          discoveryUrl: _discoveryUrl,
+          refreshToken: _refreshToken,
+          scopes: _scopes,
+        ));
 
-      final Map<String, dynamic> tokenData = json.decode(response.body);
-
-      if (response.statusCode == 200) {
-        log('Token atualizado com sucesso.');
-        // Re-processa e salva os novos tokens
-        _processToken(
-          tokenData['id_token'],
-          tokenData['access_token'],
-          tokenData['refresh_token'],
-        );
-        return true;
+        if (result != null) {
+          _processToken(
+              result.idToken!, result.accessToken!, result.refreshToken);
+          return true;
+        }
       } else {
-        // Ex: "invalid_grant" - o refresh token expirou ou foi revogado
-        log(
-          'Falha ao atualizar o token: ${tokenData['error_description'] ?? 'Erro desconhecido'}',
+        // WEB: HTTP Manual
+        final config = await _fetchOidcConfig();
+        final response = await http.post(
+          Uri.parse(config['token_endpoint']),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'grant_type': 'refresh_token',
+            'client_id': _clientId,
+            'refresh_token': _refreshToken!,
+          },
         );
-        // O refresh token é inválido. Desloga o usuário.
-        await signOut();
-        return false;
+
+        if (response.statusCode == 200) {
+          final tokenData = json.decode(response.body);
+          _processToken(
+            tokenData['id_token'],
+            tokenData['access_token'],
+            tokenData['refresh_token'],
+          );
+          return true;
+        }
       }
+      log("Falha no refresh. Deslogando.");
+      await signOut();
+      return false;
+
+
     } catch (e) {
       log('Erro crítico durante o refresh token: $e. Deslogando.');
       await signOut();
@@ -389,14 +437,22 @@ class MyAuthProvider extends ChangeNotifier {
       html.window.localStorage.remove(_kRefreshTokenKey);
       html.window.localStorage.remove(_kAccessTokenKey);
       html.window.localStorage.remove(_kIdTokenKey);
-
+    } else{
+      _storage.deleteAll();
     }
     _codeVerifier = null;
     notifyListeners();
   }
 
   Future<void> signOut() async {
-    final tokenToHint = _idToken;
+    String? tokenToHint;
+    if(kIsWeb){
+      tokenToHint =  html.window.localStorage[_kIdTokenKey];
+    } else {
+      tokenToHint = await _storage.read(key: _kIdTokenKey);
+
+    }
+
 
     _resetAuth();
 
@@ -407,7 +463,7 @@ class MyAuthProvider extends ChangeNotifier {
     if (!kIsWeb) {
       await _appAuth.endSession(
         EndSessionRequest(
-          idTokenHint: _idToken,
+          idTokenHint: tokenToHint,
           postLogoutRedirectUrl: 'com.example.oauth2://logout',
           discoveryUrl: _discoveryUrl,
         ),
