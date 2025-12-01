@@ -76,7 +76,7 @@ class MapService {
         final heatmap = Heatmap(
           heatmapId: const HeatmapId('crime_heatmap'),
           data: heatmapPoints,
-          radius: HeatmapRadius.fromPixels(70),
+          radius: HeatmapRadius.fromPixels(50),
           opacity: 0.8,
           gradient: const HeatmapGradient(
             <HeatmapGradientColor>[
